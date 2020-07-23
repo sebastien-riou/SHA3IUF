@@ -20,7 +20,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <stdlib.h>
+
 #include "sha3.h"
+#include "sha3_defs.h"
+#include "sha3_masked.h"
+
 
 #define SHA3_ASSERT( x )
 #if defined(_MSC_VER)
@@ -31,58 +36,13 @@
 #define SHA3_TRACE_BUF(format, buf, l, args...)
 #endif
 
-/* 
- * This flag is used to configure "pure" Keccak, as opposed to NIST SHA3.
- */
-#define SHA3_USE_KECCAK_FLAG 0x80000000
-#define SHA3_CW(x) ((x) & (~SHA3_USE_KECCAK_FLAG))
-
-
-#if defined(_MSC_VER)
-#define SHA3_CONST(x) x
-#else
-#define SHA3_CONST(x) x##L
-#endif
-
-#ifndef SHA3_ROTL64
-#define SHA3_ROTL64(x, y) \
-	(((x) << (y)) | ((x) >> ((sizeof(uint64_t)*8) - (y))))
-#endif
-
-static const uint64_t keccakf_rndc[24] = {
-    SHA3_CONST(0x0000000000000001UL), SHA3_CONST(0x0000000000008082UL),
-    SHA3_CONST(0x800000000000808aUL), SHA3_CONST(0x8000000080008000UL),
-    SHA3_CONST(0x000000000000808bUL), SHA3_CONST(0x0000000080000001UL),
-    SHA3_CONST(0x8000000080008081UL), SHA3_CONST(0x8000000000008009UL),
-    SHA3_CONST(0x000000000000008aUL), SHA3_CONST(0x0000000000000088UL),
-    SHA3_CONST(0x0000000080008009UL), SHA3_CONST(0x000000008000000aUL),
-    SHA3_CONST(0x000000008000808bUL), SHA3_CONST(0x800000000000008bUL),
-    SHA3_CONST(0x8000000000008089UL), SHA3_CONST(0x8000000000008003UL),
-    SHA3_CONST(0x8000000000008002UL), SHA3_CONST(0x8000000000000080UL),
-    SHA3_CONST(0x000000000000800aUL), SHA3_CONST(0x800000008000000aUL),
-    SHA3_CONST(0x8000000080008081UL), SHA3_CONST(0x8000000000008080UL),
-    SHA3_CONST(0x0000000080000001UL), SHA3_CONST(0x8000000080008008UL)
-};
-
-static const unsigned keccakf_rotc[24] = {
-    1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62,
-    18, 39, 61, 20, 44
-};
-
-static const unsigned keccakf_piln[24] = {
-    10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20,
-    14, 22, 9, 6, 1
-};
 
 /* generally called after SHA3_KECCAK_SPONGE_WORDS-ctx->capacityWords words 
  * are XORed into the state s 
  */
-static void
-keccakf(uint64_t s[25])
-{
+static void keccakf_ref(uint64_t s[25]){
     int i, j, round;
     uint64_t t, bc[5];
-#define KECCAK_ROUNDS 24
 
     for(round = 0; round < KECCAK_ROUNDS; round++) {
 
@@ -116,6 +76,19 @@ keccakf(uint64_t s[25])
         /* Iota */
         s[0] ^= keccakf_rndc[round];
     }
+}
+
+static void keccakf(uint64_t s[25]){
+    //println_bytes("s=",s,SHA3_STATE_SIZE);
+    uint64_t s_ref[25];
+    memcpy(s_ref,s,SHA3_STATE_SIZE);
+    uint64_t s_ref2[25];
+    memcpy(s_ref2,s,SHA3_STATE_SIZE);
+    keccakf_ref(s_ref);
+    keccakf_plain(s_ref2);
+    ASSERT_EQ(s_ref,s_ref2,SHA3_STATE_SIZE);
+    keccakf_masked_wrapper(s);
+    ASSERT_EQ(s_ref,s,SHA3_STATE_SIZE);
 }
 
 /* *************************** Public Inteface ************************ */
