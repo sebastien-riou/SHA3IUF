@@ -98,7 +98,29 @@ uint64_t rand64(void) {
 static void and2_masked2(uint64_t dst[2],uint64_t a[2],uint64_t b[2]){
     //see and2 operation as a multiplication
     //(a0+a1)(b0+b1)=a0b0+a0b1+a1b0+a1b1
-    uint64_t random = rand64(); // optional injection of random (random from PRNG)
+    uint64_t random = rand64(); // injection of random (random from PRNG)
+    // random are mandatory, if 0 then output is biased:
+    //
+    // a b a&b a0 a1 b0 b1  a0b0 a0b1 a1b0 a1b1   a0b0+a0b1   a0b0+a1b1
+    // 0 0  0  0  0  0  0     0    0    0    0        0           0 
+    // 0 0  0  0  0  1  1     0    0    0    0        0           0
+    // 0 0  0  1  1  0  0     0    0    0    0        0           0
+    // 0 0  0  1  1  1  1     1    1    1    1        0           0
+    // 0 1  0  0  0  0  1     0    0    0    0        0           0
+    // 0 1  0  0  0  1  0     0    0    0    0        0           0
+    // 0 1  0  1  1  0  1     0    1    0    1        1*          1*
+    // 0 1  0  1  1  1  0     1    0    1    0        1*          1*
+    // 1 0  0  0  1  0  0     0    0    0    0        0           0
+    // 1 0  0  0  1  1  1     0    0    1    1        0           1 
+    // 1 0  0  1  0  0  0     0    0    0    0        0           0
+    // 1 0  0  1  0  1  1     1    1    0    0        0           1
+    // 1 1  1  0  1  0  1     0    0    0    1        0           1*
+    // 1 1  1  0  1  1  0     0    0    1    0        0           0
+    // 1 1  1  1  0  0  1     0    1    0    0        1*          0
+    // 1 1  1  1  0  1  0     1    0    0    0        1*          1*
+    //
+    // a0b0+a0b1: all the ones match b=1 cases
+    // a0b0+a1b1: 4 ones out of 6 match b=1 cases
     dst[0] = (a[0] & b[0]) ^ ((a[0] & b[1]) ^ random);
     dst[1] = (a[1] & b[0]) ^ ((a[1] & b[1]) ^ random);
 }
